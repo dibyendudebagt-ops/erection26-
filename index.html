@@ -60,18 +60,30 @@ const firebaseConfig = {
     const db = firebase.firestore();
 
     async function submitData() {
-      const hour = document.getElementById('hour').value;
+  try {
+    const hour = document.getElementById('hour').value;
 
-      const data = {
-        shufu_male: +document.getElementById('shufu_male').value || 0,
-        shufu_female: +document.getElementById('shufu_female').value || 0,
-        thufu_male: +document.getElementById('thufu_male').value || 0,
-        thufu_female: +document.getElementById('thufu_female').value || 0,
-      };
-
-      await db.collection("votes").doc(hour).set(data);
-      alert("Saved / Updated");
+    if (!hour) {
+      alert("Enter hour");
+      return;
     }
+
+    const data = {
+      shufu_male: +document.getElementById('shufu_male').value || 0,
+      shufu_female: +document.getElementById('shufu_female').value || 0,
+      thufu_male: +document.getElementById('thufu_male').value || 0,
+      thufu_female: +document.getElementById('thufu_female').value || 0,
+    };
+
+    await db.collection("votes").doc(hour).set(data);
+
+    alert("Saved / Updated ✅");
+
+  } catch (err) {
+    alert("Error: " + err.message);
+    console.error(err);
+  }
+}
 
     let chart;
 
@@ -85,18 +97,28 @@ const firebaseConfig = {
         let thufuVotes = [];
 
         let rows = "";
-
+        
+if (snapshot.empty) {
+  document.getElementById('tableBody').innerHTML = "";
+  document.getElementById('totals').innerHTML = "No data yet";
+  return;
+}
         snapshot.forEach(doc => {
           const d = doc.data();
           const hour = doc.id;
 
-          const shufuTotal = d.shufu_male + d.shufu_female;
-          const thufuTotal = d.thufu_male + d.thufu_female;
+const shufu_male = d.shufu_male || 0;
+const shufu_female = d.shufu_female || 0;
+const thufu_male = d.thufu_male || 0;
+const thufu_female = d.thufu_female || 0;
+
+const shufuTotal = shufu_male + shufu_female;
+const thufuTotal = thufu_male + thufu_female;
 
           totalShufu += shufuTotal;
           totalThufu += thufuTotal;
-          totalMale += d.shufu_male + d.thufu_male;
-          totalFemale += d.shufu_female + d.thufu_female;
+          totalMale += shufu_male + thufu_male;
+          totalFemale += shufu_female + thufu_female;
 
           labels.push(hour);
           shufuVotes.push(shufuTotal);
@@ -104,10 +126,10 @@ const firebaseConfig = {
 
           rows += `<tr>
             <td>${hour}</td>
-            <td>${d.shufu_male}</td>
-            <td>${d.shufu_female}</td>
-            <td>${d.thufu_male}</td>
-            <td>${d.thufu_female}</td>
+          <td>${shufu_male}</td>
+            <td>${shufu_female}</td>
+            <td>${thufu_male}</td>
+            <td>${thufu_female}</td>
           </tr>`;
         });
 
