@@ -160,7 +160,13 @@ function loadCharts(){
 
     docs.forEach(d=>{
       labels.push(d.id);
-      totals.push(d.data.grandTotal || 0);
+      let runningTotal = 0;
+
+snap.forEach(doc=>{
+  const d = doc.data();
+  runningTotal += (d.grandTotal || 0);
+  totals.push(runningTotal);
+});
 
       for(let k in d.data){
 
