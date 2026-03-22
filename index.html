@@ -110,54 +110,161 @@ if (snapshot.empty) {
 const shufu_male = d.shufu_male || 0;
 const shufu_female = d.shufu_female || 0;
 const thufu_male = d.thufu_male || 0;
-const thufu_female = d.thufu_female || 0;
+<!DOCTYPE html><html>
+<head>
+  <title>Election Command Center (Multi-Candidate)</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>  <style>
+    body{margin:0;font-family:Arial;padding:10px;background:linear-gradient(135deg,#000,#FF9933,#FFD700);color:#fff}
+    .top{display:flex;gap:8px;flex-wrap:wrap}
+    .card{background:rgba(255,255,255,.12);padding:8px;border-radius:8px}
 
-const shufuTotal = shufu_male + shufu_female;
-const thufuTotal = thufu_male + thufu_female;
+    .wrap{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px;max-height:60vh;overflow:auto}
+    .cbox{background:rgba(255,255,255,.1);padding:8px;border-radius:8px}
+    .row{display:flex;gap:5px;margin:3px 0}
+    input{height:26px}
+    .name{width:100px}
+    .num{width:55px}
+    button{margin:5px;padding:6px 10px}
+    .leader{font-size:12px}
+  </style></head>
+<body><h2>🗳️ Election Command Center</h2><div class="top">
+  <div class="card" id="gt">Total: 0</div>
+  <div class="card" id="lm">Male: 0</div>
+  <div class="card" id="lf">Female: 0</div>
+  <div class="card" id="lh">Hour: --</div>
+</div><div class="wrap" id="wrap"></div><button onclick="saveData()">⚡ Save Hour</button> <button onclick="resetAll()">Reset</button>
 
-          totalShufu += shufuTotal;
-          totalThufu += thufuTotal;
-          totalMale += shufu_male + thufu_male;
-          totalFemale += shufu_female + thufu_female;
+<h3>🏆 Top Candidates</h3>
+<div id="leaders"></div><h3>📊 Hourly Trend</h3>
+<canvas id="chart"></canvas><h3>📊 Candidate Chart</h3>
+<canvas id="chart2"></canvas><script>
+const firebaseConfig = {
+apiKey: "AIzaSyD6Dy9SIazVhEJdM79aYLFqQWnj8fba2XQ",
+authDomain: "erection-26.firebaseapp.com",
+projectId: "erection-26",
+storageBucket: "erection-26.firebasestorage.app",
+messagingSenderId: "567134005797",
+appId: "1:567134005797:web:696ab8872ad550df17edcc",
+measurementId: "G-LMJ61KBQYG"
+};
 
-          labels.push(hour);
-          shufuVotes.push(shufuTotal);
-          thufuVotes.push(thufuTotal);
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
 
-          rows += `<tr>
-            <td>${hour}</td>
-          <td>${shufu_male}</td>
-            <td>${shufu_female}</td>
-            <td>${thufu_male}</td>
-            <td>${thufu_female}</td>
-          </tr>`;
-        });
+const wrap=document.getElementById('wrap');
 
-        document.getElementById('tableBody').innerHTML = rows;
+// build 60 constituencies with dynamic candidates
+for(let i=1;i<=60;i++){
+  wrap.innerHTML+=`<div class="cbox" id="c${i}">
+    <b>C${i}</b>
+    <div id="cand_${i}"></div>
+    <button onclick="addCandidate(${i})">+ Add Candidate</button>
+    <div class="leader" id="lead_${i}">Leader: -</div>
+  </div>`;
 
-        document.getElementById('totals').innerHTML = `
-          Shufu Total: ${totalShufu} <br>
-          Thufu Total: ${totalThufu} <br>
-          Male Total: ${totalMale} <br>
-          Female Total: ${totalFemale}
-        `;
+  // default 2 candidates for speed
+  addCandidate(i);
+  addCandidate(i);
+}
 
-        if (chart) chart.destroy();
+function addCandidate(i){
+  const div=document.getElementById('cand_'+i);
+  const idx=div.children.length;
+  div.innerHTML+=`<div class="row">
+    <input class="name" placeholder="Name" id="n_${i}_${idx}">
+    M<input class="num" type="number" id="m_${i}_${idx}">
+    F<input class="num" type="number" id="f_${i}_${idx}">
+  </div>`;
+}
 
-        const ctx = document.getElementById('chart');
-        chart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [
-              { label: 'Shufu', data: shufuVotes, borderWidth: 2 },
-              { label: 'Thufu', data: thufuVotes, borderWidth: 2 }
-            ]
-          }
-        });
-      });
+function hour(){
+  const h=new Date().getHours();
+  if(h<7)return"Before 07";
+  if(h>=17)return"05-05:30";
+  return`${String(h).padStart(2,'0')}-${String(h+1).padStart(2,'0')}`;
+}
+
+let chart,chart2;
+
+async function saveData(){
+  const hr=hour();
+  let data={},gM=0,gF=0;
+  let all=[];
+
+  for(let i=1;i<=60;i++){
+    const div=document.getElementById('cand_'+i);
+    let arr=[];
+
+    for(let j=0;j<div.children.length;j++){
+      let name=document.getElementById(`n_${i}_${j}`).value.trim();
+      let m=+document.getElementById(`m_${i}_${j}`).value||0;
+      let f=+document.getElementById(`f_${i}_${j}`).value||0;
+
+      if(name){
+        let total=m+f;
+        arr.push({name,male:m,female:f,total});
+        gM+=m;gF+=f;
+        all.push({name,total});
+      }
     }
 
-    loadData();
-  </script></body>
+    arr.sort((a,b)=>b.total-a.total);
+    document.getElementById('lead_'+i).innerText=arr[0]?`Leader: ${arr[0].name} (${arr[0].total})`:'Leader: -';
+
+    data['C'+i]=arr;
+  }
+
+  data.totalMale=gM;
+  data.totalFemale=gF;
+  data.grandTotal=gM+gF;
+
+  await db.collection('votes').doc(hr).set(data);
+
+  document.getElementById('gt').innerText='Total: '+data.grandTotal;
+  document.getElementById('lm').innerText='Male: '+gM;
+  document.getElementById('lf').innerText='Female: '+gF;
+  document.getElementById('lh').innerText='Hour: '+hr;
+
+  all.sort((a,b)=>b.total-a.total);
+  document.getElementById('leaders').innerHTML=all.slice(0,5).map(x=>`${x.name}: ${x.total}`).join('<br>');
+}
+
+function resetAll(){document.querySelectorAll('input').forEach(i=>i.value='');}
+
+function loadCharts(){
+  db.collection('votes').onSnapshot(snap=>{
+    let labels=[],totals=[],agg={};
+
+    snap.forEach(doc=>{
+      labels.push(doc.id);
+      const d=doc.data();
+      totals.push(d.grandTotal||0);
+
+      for(let k in d){
+        if(Array.isArray(d[k])){
+          d[k].forEach(c=>{
+            agg[c.name]=(agg[c.name]||0)+c.total;
+          });
+        }
+      }
+    });
+
+    if(chart)chart.destroy();
+    chart=new Chart(document.getElementById('chart'),{
+      type:'line',data:{labels,datasets:[{label:'Total Votes',data:totals}]}
+    });
+
+    let arr=Object.entries(agg).map(([n,v])=>({n,v})).sort((a,b)=>b.v-a.v).slice(0,5);
+
+    if(chart2)chart2.destroy();
+    chart2=new Chart(document.getElementById('chart2'),{
+      type:'bar',data:{labels:arr.map(x=>x.n),datasets:[{label:'Top Candidates',data:arr.map(x=>x.v)}]}
+    });
+  });
+}
+
+loadCharts();
+</script><div style="position:fixed;bottom:8px;right:10px;opacity:.5">©debd</div></body>
 </html>
