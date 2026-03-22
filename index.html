@@ -1,117 +1,5 @@
 <!DOCTYPE html><html>
 <head>
-  <title>Advanced Voting Dashboard</title>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-  
-  body {
-  margin: 0;
-  font-family: Arial;
-  padding: 20px;
-  background: linear-gradient(135deg, #000000, #FF9933, #FFD700);
-  color: white;
-}
-    input { margin: 5px; }
-    table {border-collapse: collapse; width: 100%; margin-top: 20px; background: white; color: black; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background: #f4f4f4; }
-    button { padding: 6px 12px; margin-top: 10px; }
-  </style>
-</head>
-<body>
-  <h2>Hourly Voting Entry</h2>Hour: <input type="text" id="hour" placeholder="09-10"><br>
-
-  <h3>Shufu</h3>
-  Male: <input type="number" id="shufu_male">
-  Female: <input type="number" id="shufu_female"><br>  <h3>Thufu</h3>
-  Male: <input type="number" id="thufu_male">
-  Female: <input type="number" id="thufu_female"><br><button onclick="submitData()">Save / Update</button>
-
-  <h2>Totals</h2>
-  <div id="totals"></div>  <h2>Hourly Data</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Hour</th>
-        <th>Candidate Shufu M</th>
-        <th>Candidate Shufu F</th>
-        <th>Candidate Thufu M</th>
-        <th>Candidate Thufu F</th>
-      </tr>
-    </thead>
-    <tbody id="tableBody"></tbody>
-  </table>  <h2>Trend Chart</h2>
-  <canvas id="chart"></canvas>  <script>
-  
-    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyD6Dy9SIazVhEJdM79aYLFqQWnj8fba2XQ",
-  authDomain: "erection-26.firebaseapp.com",
-  projectId: "erection-26",
-  storageBucket: "erection-26.firebasestorage.app",
-  messagingSenderId: "567134005797",
-  appId: "1:567134005797:web:696ab8872ad550df17edcc",
-  measurementId: "G-LMJ61KBQYG"
-};
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    async function submitData() {
-  try {
-    const hour = document.getElementById('hour').value;
-
-    if (!hour) {
-      alert("Enter hour");
-      return;
-    }
-
-    const data = {
-      shufu_male: +document.getElementById('shufu_male').value || 0,
-      shufu_female: +document.getElementById('shufu_female').value || 0,
-      thufu_male: +document.getElementById('thufu_male').value || 0,
-      thufu_female: +document.getElementById('thufu_female').value || 0,
-    };
-
-    await db.collection("votes").doc(hour).set(data);
-
-    alert("Saved / Updated ✅");
-
-  } catch (err) {
-    alert("Error: " + err.message);
-    console.error(err);
-  }
-}
-
-    let chart;
-
-    function loadData() {
-      db.collection("votes").onSnapshot(snapshot => {
-        let totalShufu = 0, totalThufu = 0;
-        let totalMale = 0, totalFemale = 0;
-
-        let labels = [];
-        let shufuVotes = [];
-        let thufuVotes = [];
-
-        let rows = "";
-        
-if (snapshot.empty) {
-  document.getElementById('tableBody').innerHTML = "";
-  document.getElementById('totals').innerHTML = "No data yet";
-  return;
-}
-        snapshot.forEach(doc => {
-          const d = doc.data();
-          const hour = doc.id;
-
-const shufu_male = d.shufu_male || 0;
-const shufu_female = d.shufu_female || 0;
-const thufu_male = d.thufu_male || 0;
-<!DOCTYPE html><html>
-<head>
   <title>Election Command Center (Multi-Candidate)</title>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -140,14 +28,13 @@ const thufu_male = d.thufu_male || 0;
 <div id="leaders"></div><h3>📊 Hourly Trend</h3>
 <canvas id="chart"></canvas><h3>📊 Candidate Chart</h3>
 <canvas id="chart2"></canvas><script>
-const firebaseConfig = {
-apiKey: "AIzaSyD6Dy9SIazVhEJdM79aYLFqQWnj8fba2XQ",
-authDomain: "erection-26.firebaseapp.com",
-projectId: "erection-26",
-storageBucket: "erection-26.firebasestorage.app",
-messagingSenderId: "567134005797",
-appId: "1:567134005797:web:696ab8872ad550df17edcc",
-measurementId: "G-LMJ61KBQYG"
+const firebaseConfig={
+  apiKey:"AIzaSyD6Dy9SIazVhEJdM79aYLFqQWnj8fba2XQ",
+  authDomain:"erection-26.firebaseapp.com",
+  projectId:"erection-26",
+  storageBucket:"erection-26.firebasestorage.app",
+  messagingSenderId:"567134005797",
+  appId:"1:567134005797:web:696ab8872ad550df17edcc"
 };
 
 firebase.initializeApp(firebaseConfig);
