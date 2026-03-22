@@ -29,6 +29,7 @@
 <canvas id="chart"></canvas><h3>📊 Candidate Chart</h3>
 <canvas id="chart2"></canvas><script>
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyD6Dy9SIazVhEJdM79aYLFqQWnj8fba2XQ",
   authDomain: "erection-26.firebaseapp.com",
@@ -79,49 +80,69 @@ function hour(){
 let chart,chart2;
 
 async function saveData(){
-  const hr=hour();
-  let data={},gM=0,gF=0;
-  let all=[];
+  try{
+    const hr = hour();
+    let data={},gM=0,gF=0;
+    let all=[];
 
-  for(let i=1;i<=60;i++){
-    const div=document.getElementById('cand_'+i);
-    let arr=[];
+    for(let i=1;i<=60;i++){
+      const div=document.getElementById('cand_'+i);
+      let arr=[];
 
-    for(let j=0;j<div.children.length;j++){
-      let name=document.getElementById(`n_${i}_${j}`).value.trim();
-      let m=+document.getElementById(`m_${i}_${j}`).value||0;
-      let f=+document.getElementById(`f_${i}_${j}`).value||0;
+      for(let j=0;j<div.children.length;j++){
+        let name=document.getElementById(`n_${i}_${j}`).value.trim();
+        let m=+document.getElementById(`m_${i}_${j}`).value||0;
+        let f=+document.getElementById(`f_${i}_${j}`).value||0;
 
-      if(name){
-        let total=m+f;
-        arr.push({name,male:m,female:f,total});
-        gM+=m;gF+=f;
-        all.push({name,total});
+        if(name){
+          let total=m+f;
+          arr.push({name,male:m,female:f,total});
+          gM+=m;gF+=f;
+          all.push({name,total});
+        }
       }
+
+      arr.sort((a,b)=>b.total-a.total);
+
+      document.getElementById('lead_'+i).innerText=
+        arr[0]?`Leader: ${arr[0].name} (${arr[0].total})`:'Leader: -';
+
+      data['C'+i]=arr;
     }
 
-    arr.sort((a,b)=>b.total-a.total);
-    document.getElementById('lead_'+i).innerText=arr[0]?`Leader: ${arr[0].name} (${arr[0].total})`:'Leader: -';
+    data.totalMale=gM;
+    data.totalFemale=gF;
+    data.grandTotal=gM+gF;
 
-    data['C'+i]=arr;
+    await db.collection('votes').doc(hr).set(data);
+
+    document.getElementById('gt').innerText='Total: '+data.grandTotal;
+    document.getElementById('lm').innerText='Male: '+gM;
+    document.getElementById('lf').innerText='Female: '+gF;
+    document.getElementById('lh').innerText='Hour: '+hr;
+
+    all.sort((a,b)=>b.total-a.total);
+
+    document.getElementById('leaders').innerHTML=
+      all.slice(0,5).map(x=>`${x.name}: ${x.total}`).join('<br>');
+
+    alert("Saved successfully ✅");
+
+  }catch(e){
+    alert("Error: "+e.message);
+    console.error(e);
   }
-
-  data.totalMale=gM;
-  data.totalFemale=gF;
-  data.grandTotal=gM+gF;
-
-  await db.collection('votes').doc(hr).set(data);
-
-  document.getElementById('gt').innerText='Total: '+data.grandTotal;
-  document.getElementById('lm').innerText='Male: '+gM;
-  document.getElementById('lf').innerText='Female: '+gF;
-  document.getElementById('lh').innerText='Hour: '+hr;
-
-  all.sort((a,b)=>b.total-a.total);
-  document.getElementById('leaders').innerHTML=all.slice(0,5).map(x=>`${x.name}: ${x.total}`).join('<br>');
 }
 
-function resetAll(){document.querySelectorAll('input').forEach(i=>i.value='');}
+function resetAll(){
+  document.querySelectorAll('input').forEach(i=>i.value='');
+
+  for(let i=1;i<=60;i++){
+    document.getElementById('lead_'+i).innerText="Leader: -";
+  }
+
+  document.getElementById('leaders').innerHTML="";
+}
 
 function loadCharts(){
   db.collection('votes').onSnapshot(snap=>{
@@ -146,7 +167,11 @@ function loadCharts(){
       type:'line',data:{labels,datasets:[{label:'Total Votes',data:totals}]}
     });
 
-    let arr=Object.entries(agg).map(([n,v])=>({n,v})).sort((a,b)=>b.v-a.v).slice(0,5);
+    let arr = Object.entries(agg)
+  .filter(([n]) => n && n !== "undefined")
+  .map(([n,v])=>({n,v}))
+  .sort((a,b)=>b.v-a.v)
+  .slice(0,5);
 
     if(chart2)chart2.destroy();
     chart2=new Chart(document.getElementById('chart2'),{
@@ -156,5 +181,5 @@ function loadCharts(){
 }
 
 loadCharts();
-</script><div style="position:fixed;bottom:8px;right:10px;opacity:.5">dibyendu_deb@outlook.com</div></body>
+</script><div style="position:fixed;bottom:8px;right:10px;opacity:.5">Page open,  locked on 13/04/2026 dibyendu_deb@outlook.com</div></body>
 </html>
