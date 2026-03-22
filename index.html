@@ -146,40 +146,78 @@ function resetAll(){
 
 function loadCharts(){
   db.collection('votes').onSnapshot(snap=>{
-    let labels=[],totals=[],agg={};
+
+    let docs = [];
 
     snap.forEach(doc=>{
-      labels.push(doc.id);
-      const d=doc.data();
-      totals.push(d.grandTotal||0);
+      docs.push({id:doc.id, data:doc.data()});
+    });
 
-      for(let k in d){
-        if(Array.isArray(d[k])){
-          d[k].forEach(c=>{
-            agg[c.name]=(agg[c.name]||0)+c.total;
+    // SORT HOURS
+    docs.sort((a,b)=>a.id.localeCompare(b.id));
+
+    let labels=[], totals=[], agg={};
+
+    docs.forEach(d=>{
+      labels.push(d.id);
+      totals.push(d.data.grandTotal || 0);
+
+      for(let k in d.data){
+
+        // ONLY CONSTITUENCY DATA (C1–C60)
+        if(k.startsWith('C') && Array.isArray(d.data[k])){
+
+          d.data[k].forEach(c=>{
+            if(!c.name) return;
+
+            // ✅ KEY WITH CONSTITUENCY
+            let key = `${c.name} (C${k.replace('C','')})`;
+
+            agg[key] = (agg[key] || 0) + c.total;
           });
+
         }
       }
     });
 
-    if(chart)chart.destroy();
-    chart=new Chart(document.getElementById('chart'),{
-      type:'line',data:{labels,datasets:[{label:'Total Votes',data:totals}]}
+    // RESET CHARTS
+    if(chart) chart.destroy();
+    if(chart2) chart2.destroy();
+
+    // 📈 HOURLY TREND
+    chart = new Chart(document.getElementById('chart'),{
+      type:'line',
+      data:{
+        labels,
+        datasets:[{
+          label:'Total Votes',
+          data:totals
+        }]
+      }
     });
 
+    // 🏆 TOP CANDIDATES WITH CONSTITUENCY
     let arr = Object.entries(agg)
-  .filter(([n]) => n && n !== "undefined")
-  .map(([n,v])=>({n,v}))
-  .sort((a,b)=>b.v-a.v)
-  .slice(0,5);
+      .map(([n,v])=>({n,v}))
+      .sort((a,b)=>b.v-a.v)
+      .slice(0,5);
 
-    if(chart2)chart2.destroy();
-    chart2=new Chart(document.getElementById('chart2'),{
-      type:'bar',data:{labels:arr.map(x=>x.n),datasets:[{label:'Top Candidates',data:arr.map(x=>x.v)}]}
+    if(arr.length === 0) return;
+
+    chart2 = new Chart(document.getElementById('chart2'),{
+      type:'bar',
+      data:{
+        labels: arr.map(x=>x.n), // ✅ shows name + constituency
+        datasets:[{
+          label:'Top Candidates',
+          data: arr.map(x=>x.v)
+        }]
+      }
     });
+
   });
 }
 
 loadCharts();
-</script><div style="position:fixed;bottom:8px;right:10px;opacity:.5">Page open for testing,  locked on 11/04/2026 dibyendu_deb@outlook.com</div></body>
+</script><div style="position:fixed;bottom:8px;right:10px;opacity:.5">Page open,  locked on 13/04/2026 dibyendu_deb@outlook.com</div></body>
 </html>
