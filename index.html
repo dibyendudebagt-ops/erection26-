@@ -50,45 +50,49 @@ button{margin:5px;padding:6px 10px}
 
 <script>
 
-const firebaseConfig = {  
-  apiKey: "AIzaSyD6Dy9SIazVhEJdM79aYLFqQWnj8fba2XQ",  
-  authDomain: "erection-26.firebaseapp.com",  
-  databaseURL: "https://erection-26-default-rtdb.asia-southeast1.firebasedatabase.app",  
-  projectId: "erection-26",  
-  storageBucket: "erection-26.firebasestorage.app",  
-  messagingSenderId: "567134005797",  
-  appId: "1:567134005797:web:696ab8872ad550df17edcc",  
-  measurementId: "G-LMJ61KBQYG"  }; 
- firebase.initializeApp(firebaseConfig);
- const db=firebase.firestore();
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyD6Dy9SIazVhEJdM79aYLFqQWnj8fba2XQ",
+  authDomain: "erection-26.firebaseapp.com",
+  databaseURL: "https://erection-26-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "erection-26",
+  storageBucket: "erection-26.firebasestorage.app",
+  messagingSenderId: "567134005797",
+  appId: "1:567134005797:web:696ab8872ad550df17edcc",
+  measurementId: "G-LMJ61KBQYG"
+};
+  
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const wrap = document.getElementById('wrap');
 
-// ✅ BUILD UI
+// ✅ BUILD UI WITH UNIQUE IDs
 for(let i=1;i<=60;i++){
   wrap.innerHTML += `
   <div class="cbox">
     <b>Constituency ${i}</b>
     <div id="cand_${i}"></div>
     <button onclick="addStation(${i})">+ Polling Station</button>
-    <div class="leader" id="lead_${i}">Total: 0</div>
+    <div id="lead_${i}">Total: 0</div>
   </div>`;
 
   addStation(i);
 }
 
-// ADD POLLING STATION
+// ✅ ADD STATION WITH IDS
 function addStation(i){
   const div = document.getElementById('cand_'+i);
   const idx = div.children.length;
 
   div.innerHTML += `
   <div class="row">
-    <input class="name" placeholder="PS Name">
-    M<input class="num" type="number">
-    F<input class="num" type="number">
+    <input id="ps_${i}_${idx}" placeholder="PS Name">
+    M<input id="m_${i}_${idx}" type="number">
+    F<input id="f_${i}_${idx}" type="number">
   </div>`;
 }
 
-// TIME SLOT
+// ✅ TIME SLOT
 function hour(){
   const h=new Date().getHours();
   if(h<7)return"Before 07";
@@ -98,42 +102,61 @@ function hour(){
 
 let chart, chart2;
 
-// ✅ SAVE DATA
-async function exportExcel(){
+// ✅ SAVE DATA (FIXED)
+async function saveData(){
   try{
-    const snapshot = await db.collection('votes').get();
+    const hr = hour();
 
-    if(snapshot.empty){
-      alert("No data found");
-      return;
-    }
+    let data={}, gM=0, gF=0;
 
-    let csv = "Hour,Constituency,Male,Female,Total\n";
+    for(let i=1;i<=60;i++){
+      const div=document.getElementById('cand_'+i);
 
-    snapshot.forEach(doc=>{
-      const hour = doc.id;
-      const d = doc.data();
+      let cMale=0, cFemale=0;
 
-      for(let i=1;i<=60;i++){
-        const c = d['C'+i];
+      for(let j=0;j<div.children.length;j++){
+        let ps=document.getElementById(`ps_${i}_${j}`)?.value;
+        let m=+document.getElementById(`m_${i}_${j}`)?.value||0;
+        let f=+document.getElementById(`f_${i}_${j}`)?.value||0;
 
-        if(c){
-          csv += `${hour},C${i},${c.totalMale||0},${c.totalFemale||0},${c.total||0}\n`;
+        if(ps){
+          cMale+=m;
+          cFemale+=f;
         }
       }
-    });
 
-    // ✅ SHOW DATA IN TEXTBOX (100% WORKING)
-    document.getElementById('excelData').value = csv;
+      data['C'+i]={
+        totalMale:cMale,
+        totalFemale:cFemale,
+        total:cMale+cFemale
+      };
 
-    alert("Data ready → Copy and paste into Excel");
+      gM+=cMale;
+      gF+=cFemale;
+
+      document.getElementById('lead_'+i).innerText =
+        `Total: ${cMale+cFemale} (M:${cMale} F:${cFemale})`;
+    }
+
+    data.totalMale=gM;
+    data.totalFemale=gF;
+    data.grandTotal=gM+gF;
+
+    await db.collection('votes').doc(hr).set(data);
+
+    document.getElementById('gt').innerText='Total: '+data.grandTotal;
+    document.getElementById('lm').innerText='Male: '+gM;
+    document.getElementById('lf').innerText='Female: '+gF;
+    document.getElementById('lh').innerText='Hour: '+hr;
+
+    alert("Saved ✅");
 
   }catch(e){
     alert("Error: "+e.message);
   }
 }
 
-// ✅ RESET (UI ONLY)
+// ✅ RESET (FULL FIX)
 function resetAll(){
   document.querySelectorAll('input').forEach(i=>i.value='');
 
@@ -141,11 +164,52 @@ function resetAll(){
     document.getElementById('lead_'+i).innerText="Total: 0";
   }
 
+  document.getElementById('excelData').value = "";
+
   if(chart) chart.destroy();
   if(chart2) chart2.destroy();
 }
 
-// ✅ LOAD CHARTS (FIXED)
+// ✅ EXPORT EXCEL (WORKING 100%)
+async function exportExcel(){
+  try{
+    const snap = await db.collection('votes').get();
+
+    if(snap.empty){
+      alert("No data");
+      return;
+    }
+
+    let csv="Hour,Constituency,Male,Female,Total\n";
+
+    snap.forEach(doc=>{
+      const d=doc.data();
+
+      for(let i=1;i<=60;i++){
+        const c=d['C'+i];
+        if(c){
+          csv+=`${doc.id},C${i},${c.totalMale||0},${c.totalFemale||0},${c.total||0}\n`;
+        }
+      }
+    });
+
+    // ✅ DOWNLOAD FILE
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Election_Data.csv";
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+  }catch(e){
+    alert("Error: "+e.message);
+  }
+}
+
+// ✅ LOAD CHARTS (FULL FIX)
 function loadCharts(){
   db.collection('votes').onSnapshot(snap=>{
 
@@ -157,58 +221,53 @@ function loadCharts(){
     let labels=[], totals=[];
     let runningTotal=0;
 
+    let latest = docs[docs.length-1]?.data || {};
+
     let consLabels=[], maleData=[], femaleData=[];
 
     docs.forEach(d=>{
       labels.push(d.id);
-
       runningTotal += (d.data.grandTotal || 0);
       totals.push(runningTotal);
-
-      // ✅ Only take LAST snapshot for constituency chart
-      for(let k in d.data){
-        if(k.startsWith('C') && d.data[k]?.totalMale !== undefined){
-
-          consLabels.push(k);
-          maleData.push(d.data[k].totalMale);
-          femaleData.push(d.data[k].totalFemale);
-        }
-      }
     });
 
-    // REMOVE DUPLICATES (important fix)
-    consLabels = [...new Set(consLabels)];
+    // ✅ ONLY LATEST DATA FOR CONSTITUENCY CHART
+    for(let i=1;i<=60;i++){
+      const c = latest['C'+i];
+      if(c){
+        consLabels.push("C"+i);
+        maleData.push(c.totalMale||0);
+        femaleData.push(c.totalFemale||0);
+      }
+    }
 
-    // RESET CHARTS
     if(chart) chart.destroy();
     if(chart2) chart2.destroy();
 
-    // 📈 HOURLY TREND
+    // 📈 TREND
     chart = new Chart(document.getElementById('chart'),{
       type:'line',
       data:{
         labels,
-        datasets:[{
-          label:'Total Votes',
-          data:totals
-        }]
+        datasets:[{label:'Total Votes',data:totals}]
       }
     });
 
-    // 📊 MALE vs FEMALE PER CONSTITUENCY
+    // 📊 GENDER CHART
     chart2 = new Chart(document.getElementById('chart2'),{
       type:'bar',
       data:{
-        labels: consLabels,
+        labels:consLabels,
         datasets:[
-          { label:'Male', data: maleData },
-          { label:'Female', data: femaleData }
+          {label:'Male',data:maleData},
+          {label:'Female',data:femaleData}
         ]
       }
     });
 
   });
 }
+
 loadCharts();
 </script><div style="position:fixed;bottom:8px;right:10px;opacity:.5">Page open,  locked on 13/04/2026 dibyendu_deb@outlook.com</div></body>
 </script>
