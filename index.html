@@ -93,16 +93,10 @@ function addStation(i){
 function hour(){
   const now = new Date();
   const h = now.getHours();
+  const m = now.getMinutes();
 
-  let slot;
-
-  if(h < 7) slot = "Before 07:00";
-  else if(h >= 17) slot = "17:00+";
-  else slot = `${String(h).padStart(2,'0')}:00-${String(h+1).padStart(2,'0')}:00`;
-
-  return slot + "_" + now.getMinutes(); // keeps it semi-unique but readable
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 }
-
 let chart, chart2;
 
 // SAVE DATA
