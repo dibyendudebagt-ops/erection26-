@@ -59,12 +59,13 @@ const firebaseConfig = {
   appId: "1:567134005797:web:696ab8872ad550df17edcc",
   measurementId: "G-LMJ61KBQYG"
 };
-
+  
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-              const wrap = document.getElementById('wrap');
+const wrap = document.getElementById('wrap');
 
+// BUILD UI
 for(let i=1;i<=60;i++){
   wrap.innerHTML += `
   <div class="cbox">
@@ -76,8 +77,10 @@ for(let i=1;i<=60;i++){
   addStation(i);
 }
 
+// ADD STATION
 function addStation(i){
   const div = document.getElementById('cand_'+i);
+
   div.innerHTML += `
   <div class="row">
     <input class="name" placeholder="PS Name">
@@ -86,13 +89,15 @@ function addStation(i){
   </div>`;
 }
 
+// TIME
 function hour(){
   const now = new Date();
-  return now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  return now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + "_" + Date.now();
 }
 
 let chart, chart2;
 
+// SAVE DATA
 async function saveData(){
   const hr = hour();
 
@@ -101,16 +106,24 @@ async function saveData(){
   for(let i=1;i<=60;i++){
     const div=document.getElementById('cand_'+i);
 
+    let stations=[];
     let cMale=0, cFemale=0;
 
     div.querySelectorAll('.row').forEach(r=>{
+      let ps=r.children[0].value.trim();
       let m=+r.children[1].value||0;
       let f=+r.children[2].value||0;
+
+      if(ps){
+        stations.push({name:ps, male:m, female:f});
+      }
+
       cMale+=m;
       cFemale+=f;
     });
 
     data['C'+i]={
+      stations,
       totalMale:cMale,
       totalFemale:cFemale,
       total:cMale+cFemale
@@ -127,7 +140,7 @@ async function saveData(){
   data.totalFemale=gF;
   data.grandTotal=gM+gF;
 
-  await db.collection('votes').doc(hr).set(data,{merge:true});
+  await db.collection('votes').doc(hr).set(data);
 
   document.getElementById('gt').innerText='Total: '+data.grandTotal;
   document.getElementById('lm').innerText='Male: '+gM;
@@ -137,6 +150,7 @@ async function saveData(){
   alert("Saved ✅");
 }
 
+// RESET
 function resetAll(){
   document.querySelectorAll('input').forEach(i=>i.value='');
 
@@ -150,26 +164,34 @@ function resetAll(){
   document.getElementById('excelData').value = "";
 }
 
+// EXPORT EXCEL (WITH POLLING STATIONS)
 async function exportExcel(){
   const snapshot = await db.collection('votes').get();
 
-  let csv = "Hour,Constituency,Male,Female,Total\n";
+  let csv = "Hour,Constituency,Polling Station,Male,Female,Total\n";
 
   snapshot.forEach(doc=>{
-    const hour = doc.id;
+    const hr = doc.id;
     const d = doc.data();
 
     for(let i=1;i<=60;i++){
       const c = d['C'+i];
-      if(c){
-        csv += `${hour},C${i},${c.totalMale||0},${c.totalFemale||0},${c.total||0}\n`;
+
+      if(c && c.stations){
+        c.stations.forEach(ps=>{
+          let total = (ps.male||0)+(ps.female||0);
+          csv += `${hr},C${i},${ps.name},${ps.male||0},${ps.female||0},${total}\n`;
+        });
       }
     }
   });
 
   document.getElementById('excelData').value = csv;
+
+  alert("Excel data ready ✅ Copy it");
 }
 
+// LOAD CHARTS (FIXED PROPERLY)
 function loadCharts(){
   db.collection('votes').onSnapshot(snap=>{
 
@@ -181,35 +203,56 @@ function loadCharts(){
     let labels=[], totals=[];
     let runningTotal=0;
 
-    let latest = docs[docs.length-1]?.data || {};
-
-    let consLabels=[], maleData=[], femaleData=[];
+    // ✅ GLOBAL AGGREGATION (ALL HOURS)
+    let consMap={};
 
     docs.forEach(d=>{
       labels.push(d.id);
+
       runningTotal += (d.data.grandTotal || 0);
       totals.push(runningTotal);
+
+      for(let i=1;i<=60;i++){
+        let key='C'+i;
+        let c=d.data[key];
+
+        if(c){
+          if(!consMap[key]){
+            consMap[key]={male:0,female:0};
+          }
+
+          consMap[key].male += (c.totalMale||0);
+          consMap[key].female += (c.totalFemale||0);
+        }
+      }
     });
 
-    for(let i=1;i<=60;i++){
-      let key = 'C'+i;
-      let c = latest[key];
+    // PREPARE CHART DATA
+    let consLabels=[], maleData=[], femaleData=[];
 
-      if(c){
-        consLabels.push(key);
-        maleData.push(c.totalMale || 0);
-        femaleData.push(c.totalFemale || 0);
-      }
-    }
+    Object.keys(consMap).forEach(k=>{
+      consLabels.push(k);
+      maleData.push(consMap[k].male);
+      femaleData.push(consMap[k].female);
+    });
 
+    // DESTROY OLD
     if(chart) chart.destroy();
     if(chart2) chart2.destroy();
 
+    // HOURLY TREND
     chart = new Chart(document.getElementById('chart'),{
       type:'line',
-      data:{labels,datasets:[{label:'Total Votes',data:totals}]}
+      data:{
+        labels,
+        datasets:[{
+          label:'Total Votes',
+          data:totals
+        }]
+      }
     });
 
+    // GENDER CHART (ALL HOURS)
     chart2 = new Chart(document.getElementById('chart2'),{
       type:'bar',
       data:{
@@ -225,8 +268,7 @@ function loadCharts(){
 }
 
 loadCharts();
-
 </script>
-
-</body>
+  </body>
 </html>
+          
