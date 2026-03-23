@@ -93,9 +93,14 @@ function addStation(i){
 function hour(){
   const now = new Date();
   const h = now.getHours();
-  const m = now.getMinutes();
 
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  let slot;
+
+  if(h < 7) slot = "Before07";
+  else if(h >= 17) slot = "17-18";
+  else slot = `${String(h).padStart(2,'0')}-${String(h+1).padStart(2,'0')}`;
+
+  return slot + "_" + Math.floor(now.getMinutes()/5); // 5-min grouping
 }
 let chart, chart2;
 
