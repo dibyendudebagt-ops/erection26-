@@ -92,8 +92,9 @@ function addStation(i){
 // TIME
 function hour(){
   const now = new Date();
-  return now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  return now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + "_" + Date.now();
 }
+
 let chart, chart2;
 
 // SAVE DATA
