@@ -89,89 +89,115 @@ function addStation(i){
   </div>`;
 }
 
-// TIME
+// ✅ CLEAN HOUR SLOT
 function hour(){
-  const now = new Date();
-  const h = now.getHours();
+  const h = new Date().getHours();
 
-  let slot;
+  if(h < 7) return "Before07";
+  if(h >= 17) return "17-18";
 
-  if(h < 7) slot = "Before07";
-  else if(h >= 17) slot = "17-18";
-  else slot = `${String(h).padStart(2,'0')}-${String(h+1).padStart(2,'0')}`;
-
-  return slot + "_" + Math.floor(now.getMinutes()/5); // 5-min grouping
+  return `${String(h).padStart(2,'0')}-${String(h+1).padStart(2,'0')}`;
 }
+
 let chart, chart2;
 
 // SAVE DATA
 async function saveData(){
-  const hr = hour();
+  try{
+    const hr = hour();
 
-  let data={}, gM=0, gF=0;
+    let data={}, gM=0, gF=0;
 
-  for(let i=1;i<=60;i++){
-    const div=document.getElementById('cand_'+i);
+    for(let i=1;i<=60;i++){
+      const div=document.getElementById('cand_'+i);
 
-    let stations=[];
-    let cMale=0, cFemale=0;
+      let stations=[];
+      let cMale=0, cFemale=0;
 
-    div.querySelectorAll('.row').forEach(r=>{
-      let ps=r.children[0].value.trim();
-      let m=+r.children[1].value||0;
-      let f=+r.children[2].value||0;
+      div.querySelectorAll('.row').forEach(r=>{
+        let ps=r.children[0].value.trim();
+        let m=+r.children[1].value||0;
+        let f=+r.children[2].value||0;
 
-      if(ps){
-        stations.push({name:ps, male:m, female:f});
-      }
+        if(ps){
+          stations.push({name:ps, male:m, female:f});
+        }
 
-      cMale+=m;
-      cFemale+=f;
+        cMale+=m;
+        cFemale+=f;
+      });
+
+      data['C'+i]={
+        stations,
+        totalMale:cMale,
+        totalFemale:cFemale,
+        total:cMale+cFemale
+      };
+
+      gM+=cMale;
+      gF+=cFemale;
+
+      document.getElementById('lead_'+i).innerText =
+        `Total: ${cMale+cFemale} (M:${cMale} F:${cFemale})`;
+    }
+
+    data.totalMale=gM;
+    data.totalFemale=gF;
+    data.grandTotal=gM+gF;
+
+    await db.collection('votes').doc(hr).set(data,{merge:true});
+
+    document.getElementById('gt').innerText='Total: '+data.grandTotal;
+    document.getElementById('lm').innerText='Male: '+gM;
+    document.getElementById('lf').innerText='Female: '+gF;
+    document.getElementById('lh').innerText='Hour: '+hr;
+
+    alert("Saved ✅");
+
+  }catch(e){
+    alert("Error: "+e.message);
+  }
+}
+
+// 🔥 RESET DATABASE + UI
+async function resetAll(){
+  if(!confirm("⚠️ This will DELETE ALL DATA. Continue?")) return;
+
+  try{
+    const snap = await db.collection('votes').get();
+
+    const batch = db.batch();
+    snap.forEach(doc=>{
+      batch.delete(doc.ref);
     });
 
-    data['C'+i]={
-      stations,
-      totalMale:cMale,
-      totalFemale:cFemale,
-      total:cMale+cFemale
-    };
+    await batch.commit();
 
-    gM+=cMale;
-    gF+=cFemale;
+    // CLEAR UI
+    document.querySelectorAll('input').forEach(i=>i.value='');
 
-    document.getElementById('lead_'+i).innerText =
-      `Total: ${cMale+cFemale} (M:${cMale} F:${cFemale})`;
+    for(let i=1;i<=60;i++){
+      document.getElementById('lead_'+i).innerText="Total: 0";
+    }
+
+    document.getElementById('gt').innerText="Total: 0";
+    document.getElementById('lm').innerText="Male: 0";
+    document.getElementById('lf').innerText="Female: 0";
+    document.getElementById('lh').innerText="Hour: --";
+
+    document.getElementById('excelData').value="";
+
+    if(chart) chart.destroy();
+    if(chart2) chart2.destroy();
+
+    alert("Database Reset Successful ✅");
+
+  }catch(e){
+    alert("Reset failed: "+e.message);
   }
-
-  data.totalMale=gM;
-  data.totalFemale=gF;
-  data.grandTotal=gM+gF;
-
-  await db.collection('votes').doc(hr).set(data);
-
-  document.getElementById('gt').innerText='Total: '+data.grandTotal;
-  document.getElementById('lm').innerText='Male: '+gM;
-  document.getElementById('lf').innerText='Female: '+gF;
-  document.getElementById('lh').innerText='Hour: '+hr;
-
-  alert("Saved ✅");
 }
 
-// RESET
-function resetAll(){
-  document.querySelectorAll('input').forEach(i=>i.value='');
-
-  for(let i=1;i<=60;i++){
-    document.getElementById('lead_'+i).innerText="Total: 0";
-  }
-
-  if(chart) chart.destroy();
-  if(chart2) chart2.destroy();
-
-  document.getElementById('excelData').value = "";
-}
-
-// EXPORT EXCEL (WITH POLLING STATIONS)
+// EXPORT EXCEL
 async function exportExcel(){
   const snapshot = await db.collection('votes').get();
 
@@ -194,11 +220,9 @@ async function exportExcel(){
   });
 
   document.getElementById('excelData').value = csv;
-
-  alert("Excel data ready ✅ Copy it");
 }
 
-// LOAD CHARTS (FIXED PROPERLY)
+// LOAD CHARTS
 function loadCharts(){
   db.collection('votes').onSnapshot(snap=>{
 
@@ -210,7 +234,6 @@ function loadCharts(){
     let labels=[], totals=[];
     let runningTotal=0;
 
-    // ✅ GLOBAL AGGREGATION (ALL HOURS)
     let consMap={};
 
     docs.forEach(d=>{
@@ -234,7 +257,6 @@ function loadCharts(){
       }
     });
 
-    // PREPARE CHART DATA
     let consLabels=[], maleData=[], femaleData=[];
 
     Object.keys(consMap).forEach(k=>{
@@ -243,23 +265,23 @@ function loadCharts(){
       femaleData.push(consMap[k].female);
     });
 
-    // DESTROY OLD
     if(chart) chart.destroy();
     if(chart2) chart2.destroy();
 
-    // HOURLY TREND
+    // 📈 HOURLY TREND
     chart = new Chart(document.getElementById('chart'),{
       type:'line',
       data:{
         labels,
         datasets:[{
           label:'Total Votes',
-          data:totals
+          data:totals,
+          tension:0.3
         }]
       }
     });
 
-    // GENDER CHART (ALL HOURS)
+    // 📊 GENDER CHART (ALL DATA)
     chart2 = new Chart(document.getElementById('chart2'),{
       type:'bar',
       data:{
