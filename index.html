@@ -1,303 +1,250 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Election Command Center</title>
-
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-body{margin:0;font-family:Arial;padding:10px;background:linear-gradient(135deg,#000,#FF9933,#FFD700);color:#fff}
-.top{display:flex;gap:8px;flex-wrap:wrap}
-.card{background:rgba(255,255,255,.12);padding:8px;border-radius:8px}
-.wrap{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px;max-height:60vh;overflow:auto}
-.cbox{background:rgba(255,255,255,.1);padding:8px;border-radius:8px}
-.row{display:flex;gap:5px;margin:3px 0}
-input{height:26px}
-.name{width:90px}
-.num{width:55px}
-button{margin:5px;padding:6px 10px}
-</style>
+  <title>Pitman Smart Recognition (Hybrid AI)</title>
+  <style>
+    body { text-align:center; font-family:Arial; }
+    canvas { border:2px solid black; touch-action:none; }
+    button { margin:10px; padding:10px; }
+  </style>
 </head>
-
 <body>
 
-<h2>🗳️ Election Command Center</h2>
+<h2>Smart Pitman Recognition </h2>
 
-<div class="top">
-<div class="card" id="gt">Total: 0</div>
-<div class="card" id="lm">Male: 0</div>
-<div class="card" id="lf">Female: 0</div>
-<div class="card" id="lh">Hour: --</div>
-</div>
+<canvas id="canvas" width="220" height="220"></canvas><br>
 
-<div class="wrap" id="wrap"></div>
+<button onclick="clearCanvas()">Clear</button>
+<button onclick="recognize()">Recognize</button>
 
-<button onclick="saveData()">⚡ Save Hour</button>
-<button onclick="resetAll()"> ♻️Reset</button>
-<button onclick="exportExcel()">📥 Copy to Excel</button>
-
-<textarea id="excelData" style="width:100%;height:200px;margin-top:10px;"></textarea>
-
-<h3>📈 Hourly Trend</h3>
-<canvas id="chart"></canvas>
-
-<h3>📊 Constituency Gender Chart</h3>
-<canvas id="chart2"></canvas>
+<h3 id="result"></h3>
 
 <script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyD6Dy9SIazVhEJdM79aYLFqQWnj8fba2XQ",
-  authDomain: "erection-26.firebaseapp.com",
-  databaseURL: "https://erection-26-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "erection-26",
-  storageBucket: "erection-26.firebasestorage.app",
-  messagingSenderId: "567134005797",
-  appId: "1:567134005797:web:696ab8872ad550df17edcc",
-  measurementId: "G-LMJ61KBQYG"
-};
-  
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+let drawing = false;
+let stroke = [];
 
-const wrap = document.getElementById('wrap');
+// ---------------- DRAW ----------------
+canvas.addEventListener("mousedown", start);
+canvas.addEventListener("mousemove", draw);
+canvas.addEventListener("mouseup", end);
 
-// BUILD UI
-for(let i=1;i<=60;i++){
-  wrap.innerHTML += `
-  <div class="cbox">
-    <b>Constituency ${i}</b>
-    <div id="cand_${i}"></div>
-    <button onclick="addStation(${i})">+ Polling Station</button>
-    <div id="lead_${i}">Total: 0</div>
-  </div>`;
-  addStation(i);
+canvas.addEventListener("touchstart", e=>start(e.touches[0]));
+canvas.addEventListener("touchmove", e=>{
+  e.preventDefault();
+  draw(e.touches[0]);
+});
+canvas.addEventListener("touchend", end);
+
+function start(e){
+  drawing=true;
+  stroke=[];
+  ctx.beginPath();
+
+  let r = canvas.getBoundingClientRect();
+  let x = e.clientX - r.left;
+  let y = e.clientY - r.top;
+
+  stroke.push({x,y});
+  ctx.moveTo(x,y);
 }
 
-// ADD STATION
-function addStation(i){
-  const div = document.getElementById('cand_'+i);
+function draw(e){
+  if(!drawing) return;
 
-  div.innerHTML += `
-  <div class="row">
-    <input class="name" placeholder="PS Name">
-    M<input class="num" type="number">
-    F<input class="num" type="number">
-  </div>`;
+  let r = canvas.getBoundingClientRect();
+  let x = e.clientX - r.left;
+  let y = e.clientY - r.top;
+
+  stroke.push({x,y});
+
+  ctx.lineWidth=5;
+  ctx.lineCap="round";
+  ctx.lineTo(x,y);
+  ctx.stroke();
 }
 
-// ✅ CLEAN HOUR SLOT
-function hour(){
-  const h = new Date().getHours();
+function end(){ drawing=false; }
 
-  if(h < 7) return "Before07";
-  if(h >= 17) return "17-18";
-
-  return `${String(h).padStart(2,'0')}-${String(h+1).padStart(2,'0')}`;
+function clearCanvas(){
+  ctx.clearRect(0,0,220,220);
+  stroke=[];
+  document.getElementById("result").innerText="";
 }
 
-let chart, chart2;
+// ---------------- FEATURE ENGINE ----------------
+function getAngle(a,b){
+  return Math.atan2(b.y-a.y, b.x-a.x) * 180/Math.PI;
+}
 
-// SAVE DATA
-async function saveData(){
-  try{
-    const hr = hour();
+function getLength(){
+  let start = stroke[0];
+  let end = stroke[stroke.length-1];
+  return Math.hypot(end.x-start.x, end.y-start.y);
+}
 
-    let data={}, gM=0, gF=0;
+function isCurve(){
+  let total=0;
+  for(let i=2;i<stroke.length;i++){
+    let a1 = getAngle(stroke[i-2], stroke[i-1]);
+    let a2 = getAngle(stroke[i-1], stroke[i]);
 
-    for(let i=1;i<=60;i++){
-      const div=document.getElementById('cand_'+i);
+    let diff = Math.abs(a2-a1);
+    if(diff>180) diff = 360-diff;
+    total += diff;
+  }
+  return total > 60;
+}
 
-      let stations=[];
-      let cMale=0, cFemale=0;
+function curveDirection(){
+  let sum=0;
+  for(let i=2;i<stroke.length;i++){
+    let a1 = getAngle(stroke[i-2], stroke[i-1]);
+    let a2 = getAngle(stroke[i-1], stroke[i]);
+    sum += (a2-a1);
+  }
+  return sum > 0 ? "left" : "right";
+}
 
-      div.querySelectorAll('.row').forEach(r=>{
-        let ps=r.children[0].value.trim();
-        let m=+r.children[1].value||0;
-        let f=+r.children[2].value||0;
+// ---------------- PNG ASSIST ----------------
+const dataset = [
+  {name:"P", img:"./P.png"},
+  {name:"B", img:"./B.png"},
+  {name:"Ch", img:"./Ch.png"},
+  {name:"J", img:"./J.png"},
+  {name:"T", img:"./T.png"},
+  {name:"D", img:"./D.png"},
+  {name:"K", img:"./K.png"},
+  {name:"Gay", img:"./Gay.png"},
+  {name:"F", img:"./F.png"},
+  {name:"V", img:"./V.png"},
+];
 
-        if(ps){
-          stations.push({name:ps, male:m, female:f});
-        }
+let loaded = [];
 
-        cMale+=m;
-        cFemale+=f;
-      });
+async function preload(){
+  for(let d of dataset){
+    let img = new Image();
+    img.src = d.img;
+    await new Promise(res=>img.onload=res);
 
-      data['C'+i]={
-        stations,
-        totalMale:cMale,
-        totalFemale:cFemale,
-        total:cMale+cFemale
-      };
+    let c = document.createElement("canvas");
+    c.width=50; c.height=50;
+    let ct = c.getContext("2d");
+    ct.drawImage(img,0,0,50,50);
 
-      gM+=cMale;
-      gF+=cFemale;
-
-      document.getElementById('lead_'+i).innerText =
-        `Total: ${cMale+cFemale} (M:${cMale} F:${cFemale})`;
-    }
-
-    data.totalMale=gM;
-    data.totalFemale=gF;
-    data.grandTotal=gM+gF;
-
-    await db.collection('votes').doc(hr).set(data,{merge:true});
-
-    document.getElementById('gt').innerText='Total: '+data.grandTotal;
-    document.getElementById('lm').innerText='Male: '+gM;
-    document.getElementById('lf').innerText='Female: '+gF;
-    document.getElementById('lh').innerText='Hour: '+hr;
-
-    alert("Saved ✅");
-
-  }catch(e){
-    alert("Error: "+e.message);
+    loaded.push({
+      name:d.name,
+      data: ct.getImageData(0,0,50,50).data
+    });
   }
 }
+preload();
 
-// 🔥 RESET DATABASE + UI
-async function resetAll(){
-  if(!confirm("⚠️ This will DELETE ALL DATA. Continue?")) return;
+function getCanvasData(){
+  let c = document.createElement("canvas");
+  c.width=50; c.height=50;
+  let ct = c.getContext("2d");
+  ct.drawImage(canvas,0,0,50,50);
+  return ct.getImageData(0,0,50,50).data;
+}
 
-  try{
-    const snap = await db.collection('votes').get();
-
-    const batch = db.batch();
-    snap.forEach(doc=>{
-      batch.delete(doc.ref);
-    });
-
-    await batch.commit();
-
-    // CLEAR UI
-    document.querySelectorAll('input').forEach(i=>i.value='');
-
-    for(let i=1;i<=60;i++){
-      document.getElementById('lead_'+i).innerText="Total: 0";
-    }
-
-    document.getElementById('gt').innerText="Total: 0";
-    document.getElementById('lm').innerText="Male: 0";
-    document.getElementById('lf').innerText="Female: 0";
-    document.getElementById('lh').innerText="Hour: --";
-
-    document.getElementById('excelData').value="";
-
-    if(chart) chart.destroy();
-    if(chart2) chart2.destroy();
-
-    alert("Database Reset Successful ✅");
-
-  }catch(e){
-    alert("Reset failed: "+e.message);
+function compare(a,b){
+  let diff=0;
+  for(let i=0;i<a.length;i+=4){
+    diff += Math.abs(a[i]-b[i]);
   }
+  return diff;
 }
 
-// EXPORT EXCEL
-async function exportExcel(){
-  const snapshot = await db.collection('votes').get();
+// ---------------- SMART RECOGNITION ----------------
+function recognize(){
 
-  let csv = "Hour,Constituency,Polling Station,Male,Female,Total\n";
+  if(stroke.length < 5){
+    document.getElementById("result").innerText="Draw properly";
+    return;
+  }
 
-  snapshot.forEach(doc=>{
-    const hr = doc.id;
-    const d = doc.data();
+  let start = stroke[0];
+  let end = stroke[stroke.length-1];
 
-    for(let i=1;i<=60;i++){
-      const c = d['C'+i];
+  let angle = getAngle(start,end);
+  let length = getLength();
+  let curve = isCurve();
+  let dir = curveDirection();
 
-      if(c && c.stations){
-        c.stations.forEach(ps=>{
-          let total = (ps.male||0)+(ps.female||0);
-          csv += `${hr},C${i},${ps.name},${ps.male||0},${ps.female||0},${total}\n`;
-        });
-      }
+  let result = "Unknown";
+
+  // -------- RULE ENGINE --------
+
+  // Straight strokes
+  if(!curve){
+    if(Math.abs(angle) > 50  && Math.abs(angle) < 90) result = "P";
+    else if(Math.abs(angle) > 70 && Math.abs(angle) < 110) result = "T";
+    else if(Math.abs(angle) < 90 && Math.abs(angle) < 180) result = "K";
+  }
+
+  // Curves
+  else{
+    if(dir === "right") result = "F";   // matches your case
+    else if(dir === "left")  result = "Ish";
+  }
+
+  // -------- PNG REFINEMENT --------
+  let userData = getCanvasData();
+  let best = result;
+  let bestScore = Infinity;
+
+  for(let item of loaded){
+    let score = compare(userData, item.data);
+
+    if(score < bestScore){
+      bestScore = score;
+      best = item.name;
     }
-  });
+  }
 
-  document.getElementById('excelData').value = csv;
+  // Combine logic + image
+  if(bestScore < 180000){
+    result = best;
+  }
+
+  document.getElementById("result").innerText =
+    "Detected: " + result + " | angle:"+Math.round(angle)+" | curve:"+curve+" | dir:"+dir;
 }
-
-// LOAD CHARTS
-function loadCharts(){
-  db.collection('votes').onSnapshot(snap=>{
-
-    let docs=[];
-    snap.forEach(doc=>docs.push({id:doc.id,data:doc.data()}));
-
-    docs.sort((a,b)=>a.id.localeCompare(b.id));
-
-    let labels=[], totals=[];
-    let runningTotal=0;
-
-    let consMap={};
-
-    docs.forEach(d=>{
-      labels.push(d.id);
-
-      runningTotal += (d.data.grandTotal || 0);
-      totals.push(runningTotal);
-
-      for(let i=1;i<=60;i++){
-        let key='C'+i;
-        let c=d.data[key];
-
-        if(c){
-          if(!consMap[key]){
-            consMap[key]={male:0,female:0};
-          }
-
-          consMap[key].male += (c.totalMale||0);
-          consMap[key].female += (c.totalFemale||0);
-        }
-      }
-    });
-
-    let consLabels=[], maleData=[], femaleData=[];
-
-    Object.keys(consMap).forEach(k=>{
-      consLabels.push(k);
-      maleData.push(consMap[k].male);
-      femaleData.push(consMap[k].female);
-    });
-
-    if(chart) chart.destroy();
-    if(chart2) chart2.destroy();
-
-    // 📈 HOURLY TREND
-    chart = new Chart(document.getElementById('chart'),{
-      type:'line',
-      data:{
-        labels,
-        datasets:[{
-          label:'Total Votes',
-          data:totals,
-          tension:0.3
-        }]
-      }
-    });
-
-    // 📊 GENDER CHART (ALL DATA)
-    chart2 = new Chart(document.getElementById('chart2'),{
-      type:'bar',
-      data:{
-        labels: consLabels,
-        datasets:[
-          { label:'Male', data: maleData },
-          { label:'Female', data: femaleData }
-        ]
-      }
-    });
-
-  });
-}
-
-loadCharts();
 </script>
-  </body>
+<h3>Application Feedback</h3>
+
+<p>
+The application demonstrates a promising approach to Pitman shorthand recognition.
+</p>
+
+<p>
+The current recognition system is not consistently accurate, particularly for curved strokes 
+and similar-shaped consonants (e.g., M vs N, F vs other curves).
+</p>
+
+<p>
+While the hybrid logic (angle, curve detection, etc.) improves performance, it still requires 
+more refinement in stroke analysis, such as better normalization, smoothing, and direction detection.
+</p>
+
+<p>
+Overall, the project shows strong potential but needs further research and development, particularly in:
+</p>
+
+<ul>
+  <li>Advanced shape recognition algorithms</li>
+  <li>Machine learning or pattern training approaches</li>
+  <li>Improved preprocessing (centering, scaling, noise reduction)</li>
+</ul>
+
+<p>
+With continued development, this application could evolve into a powerful educational tool for learning Pitman shorthand.
+</p>
+  
+
+</body>
 </html>
-          
